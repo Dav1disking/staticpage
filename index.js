@@ -20,9 +20,8 @@ function search(term) {
   results.hidden = true;
   browserView.hidden = false;
 
-  // Search inside the iframe
   const searchUrl =
-    "https://www.google.com/search?q=" + encodeURIComponent(term);
+    "https://duckduckgo.com/?q=" + encodeURIComponent(term);
 
   address.value = searchUrl;
   websiteFrame.src = searchUrl;
