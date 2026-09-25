@@ -14,40 +14,22 @@ function search(term) {
   term = term.trim();
   if (!term) return;
 
-  query.value = term;
-
-  home.hidden = true;
-  results.hidden = true;
-  browserView.hidden = false;
-
   const searchUrl =
     "https://duckduckgo.com/?q=" + encodeURIComponent(term);
 
-  address.value = searchUrl;
-  websiteFrame.src = searchUrl;
+  window.location.href = searchUrl;
 }
 
 function goAddress() {
   const raw = address.value.trim();
   if (!raw) return;
 
-  // Duckly internal search URL
-  if (raw.startsWith("search.local/search?q=")) {
-    try {
-      const url = new URL("https://" + raw);
-      search(url.searchParams.get("q") || "");
-      return;
-    } catch {}
-  }
-
   let target = raw;
 
-  // Automatically add https://
   if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(target)) {
     if (/^[\w.-]+\.[a-z]{2,}(?:[/:?#].*)?$/i.test(target)) {
       target = "https://" + target;
     } else {
-      // Not a URL, so search it
       search(raw);
       return;
     }
@@ -61,7 +43,6 @@ function goAddress() {
       return;
     }
 
-    // Show the website inside Duckly
     home.hidden = true;
     results.hidden = true;
     browserView.hidden = false;
