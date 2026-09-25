@@ -1,11 +1,13 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Duckly Browser</title>
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
   <div class="browser">
 
@@ -36,6 +38,11 @@
     </main>
   </div>
 
+  <section class="browser-view" id="browserView" hidden>
+    <iframe id="websiteFrame" title="Website" referrerpolicy="no-referrer" allow="fullscreen"></iframe>
+  </section>
+
   <script src="index.js"></script>
 </body>
+
 </html>

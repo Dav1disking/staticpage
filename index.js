@@ -282,3 +282,42 @@ function escapeHTML(value) {
     }
   );
 }
+
+function goAddress() {
+  const raw = address.value.trim();
+
+  if (!raw) return;
+
+  let target = raw;
+
+  // If it doesn't have https:// or http://,
+  // automatically add https://
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(target)) {
+    if (/^[\w.-]+\.[a-z]{2,}(?:[/:?#].*)?$/i.test(target)) {
+      target = "https://" + target;
+    } else {
+      search(raw);
+      return;
+    }
+  }
+
+  try {
+    const url = new URL(target);
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      search(raw);
+      return;
+    }
+
+    // Show the website inside Duckly
+    home.hidden = true;
+    results.hidden = true;
+    browserView.hidden = false;
+
+    address.value = url.href;
+    websiteFrame.src = url.href;
+
+  } catch {
+    search(raw);
+  }
+}
