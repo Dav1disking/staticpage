@@ -2,6 +2,8 @@ const query = document.getElementById("query");
 const results = document.getElementById("results");
 const home = document.getElementById("home");
 const address = document.getElementById("address");
+const browserView = document.getElementById("browserView");
+const websiteFrame = document.getElementById("websiteFrame");
 
 
 // =========================
