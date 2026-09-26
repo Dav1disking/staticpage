@@ -1,80 +1,159 @@
-# Duckly Browser — with backend proxy
+# Duckly — GitHub Pages + Cloudflare Worker
 
-## Run it
+This version does **not** require Node.js.
 
+## Files
+
+- `site/` — upload these files to a GitHub Pages repository.
+- `worker/worker.js` — deploy this as a Cloudflare Worker.
+
+The GitHub Pages site is only the browser UI. The Worker performs the server-side
+fetching and rewriting.
+
+## 1. Deploy the GitHub Pages site
+
+Put these files in your GitHub repository:
+
+```text
+index.html
+index.js
+style.css
 ```
-npm install
-npm start
+
+Enable GitHub Pages for the repository.
+
+## 2. Deploy the proxy without Node
+
+In Cloudflare:
+
+1. Open **Workers & Pages**.
+2. Create a new Worker.
+3. Open its code editor.
+4. Replace the starter code with `worker/worker.js`.
+5. Deploy it.
+6. Copy the Worker URL, for example:
+
+```text
+https://duckly-proxy.example.workers.dev
 ```
 
-Then open http://localhost:3000
+The proxy endpoint is:
 
-## How it works
+```text
+https://duckly-proxy.example.workers.dev/proxy
+```
 
-- `server.js` is an Express server. `GET /proxy?url=<target>` fetches the
-  target page server-side, rewrites every `href`/`src`/`action`/CSS `url()`
-  it finds so they also point back through `/proxy?url=...`, strips any
-  `X-Frame-Options`/`Content-Security-Policy` the page sets, and returns the
-  result.
-- The front-end (`public/`) is served from the same Express app, so the app
-  shell and every proxied page share one origin. That's what lets Reload,
-  page titles, and the history dropdown work — the iframe is never
-  cross-origin relative to the parent page.
-- Clicking a link inside a proxied page just works: since every link was
-  rewritten to `/proxy?url=...`, the browser follows it natively and the
-  iframe's `load` event is what the app listens to for updating the address
-  bar and history.
+No Node.js, npm, Express, or package installation is needed.
 
-## What's new in this version
+## 3. Connect GitHub Pages to the Worker
 
-- **Google/Chrome-style layout.** Clean white theme, colorful "Duckly"
-  wordmark, a single centered search bar with Search / "I'm Feeling Lucky"
-  buttons, and your pinned shortcuts rendered as Chrome-new-tab-style round
-  tiles underneath.
-- **"I'm Feeling Lucky"** runs the search and automatically opens the first
-  result instead of making you click it.
-- **Pinned shortcuts** — click "+ Add" to save any site as a tile (name +
-  URL), click a tile to open it through the proxy, right-click to remove it.
-  Saved in the browser's `localStorage`, so they persist across visits.
-- **Faster.** Responses back to your browser are gzip/br-compressed. Shared
-  assets (CSS, JS, images, fonts) are cached server-side for 5 minutes, so
-  navigating between pages on the same site doesn't re-fetch the same
-  stylesheet or logo from upstream every time — it's a memory hit instead of
-  a network round trip. Large files (videos, big downloads) stream straight
-  through instead of being fully buffered in memory first, so the browser
-  starts receiving bytes immediately.
-- **Cookies/sessions carry through.** Each visitor gets a `duckly_sid` cookie
-  from our own server, which maps to a server-side jar of cookies set by
-  each site you visit through the proxy. So logging into a site, or a site
-  remembering a preference, now actually persists across requests.
-- **Forms fully work**, including POST — the proxy forwards method, body,
-  and content-type to the upstream site.
-- **`@import` in stylesheets** is rewritten, not just `url(...)`, and inline
-  `<style>` blocks are rewritten too.
-- **Downloads work.** `Content-Disposition`/`Content-Length` are forwarded
-  from the origin, with a fallback that infers "download" for common
-  binary file types (.zip, .exe, .dmg, etc.) even if the origin didn't set it.
-- **Links/popups stay inside the app.** `target="_blank"` is stripped and
-  `window.open()` is overridden so navigation doesn't escape the iframe.
+Open `site/index.js` and change:
 
-## Known limitations
+```js
+const PROXY_ENDPOINT = "https://YOUR-WORKER.workers.dev/proxy";
+```
 
-- Heavy single-page apps (things that fetch most of their content via JS
-  after the initial page load — X/Twitter, many modern web apps) will often
-  render partially or break, since only the initial HTML/CSS/images are
-  rewritten; a live in-page `fetch()`/`XMLHttpRequest` call the site itself
-  makes still goes directly to the original domain and will usually be
-  blocked by CORS.
-- Sites with anti-bot/anti-proxy detection may refuse or serve degraded
-  content.
-- Login/cookie-dependent sites won't carry your session, since each request
-  is a fresh, stateless server-side fetch.
-- `srcset` attributes are stripped rather than rewritten (kept simple —
-  falls back to the already-proxied `src`).
+to your actual Worker endpoint.
 
-## Deploying
+Commit the file to GitHub Pages.
 
-For real hosting, put this behind HTTPS (e.g. behind Caddy/Nginx or a
-platform like Render/Fly.io) and consider adding: a request timeout, a
-size cap on proxied responses, and a simple allow/deny list if you want to
-restrict what can be fetched.
+## How the proxy works
+
+A target such as:
+
+```text
+https://example.com/page.html
+```
+
+is requested by the browser as:
+
+```text
+https://your-worker.workers.dev/proxy?url=https%3A%2F%2Fexample.com%2Fpage.html
+```
+
+The Worker fetches the target server-side.
+
+For HTML it rewrites links/resources back through the Worker. It also injects a
+small bridge that:
+
+- keeps navigation inside the Duckly iframe
+- reports the current target URL to the GitHub Pages app with `postMessage`
+- routes page `fetch()` calls through the proxy
+- routes `XMLHttpRequest` through the proxy
+- routes `sendBeacon()` through the proxy
+- keeps `window.open()` navigation inside Duckly
+
+CSS `url(...)` and `@import` references are also rewritten.
+
+## Important limitation
+
+GitHub Pages itself cannot be an arbitrary web proxy. Static HTML/JS runs in the
+visitor's browser, so it cannot securely fetch arbitrary websites as a server.
+
+The Cloudflare Worker is the server-side part. This is why this setup can work
+without Node while still having a real proxy.
+
+## About hiding the proxy
+
+The Worker source and private server-side implementation do not have to be sent
+to the browser.
+
+However, it is **not possible to make proxy behavior completely invisible to a
+visitor**. A person controlling their browser can inspect:
+
+- HTML
+- JavaScript
+- DOM/page structure
+- network requests
+- request URLs
+- response timing and headers
+- iframe behavior
+
+Do not put API keys, passwords, private tokens, or other secrets in the GitHub
+HTML/JS.
+
+If the Worker source is kept in Cloudflare instead of the public GitHub
+repository, the implementation itself is not part of the GitHub Pages files,
+but the browser can still observe what requests it makes.
+
+## Security
+
+The Worker rejects localhost and common private IPv4 targets. This helps reduce
+accidental internal-network access, but it is still an open proxy if arbitrary
+public URLs are allowed.
+
+For a public deployment, consider adding:
+
+- authentication
+- per-user rate limits
+- an allowlist of domains
+- response-size limits
+- abuse monitoring
+- caching where appropriate
+
+Also note that some websites intentionally block proxying or embedding, and
+some complex web applications use WebSockets, service workers, browser storage,
+or highly dynamic JavaScript that cannot be perfectly rewritten by a generic
+proxy.
+
+## jsDelivr vs S3 vs Duckly
+
+A URL such as:
+
+```text
+https://cdn.jsdelivr.net/gh/petezahiscool/svg@main/index.svg
+```
+
+is primarily a CDN URL that maps a GitHub repository/branch/path to a cached
+static resource. It is not a general-purpose proxy for arbitrary websites.
+
+A URL such as:
+
+```text
+https://opiumbest.s3.amazonaws.com/index.htm
+```
+
+is a direct S3 object URL.
+
+Duckly's Worker is different: it accepts a target URL, fetches it server-side,
+rewrites references, and returns the transformed response to the browser.
